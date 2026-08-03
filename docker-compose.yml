@@ -14,4 +14,6 @@ services:
       - ./backend/models:/app/backend/models
     environment:
       PVT_RENDER_PARALLEL: "3"   # 동시 ffmpeg 개수. CPU 코어에 맞춰 조정하세요.
-    restart: unless-stopped
+    # restart 정책을 두지 않습니다. 내 사진을 다루는 개인용 도구가 컴퓨터를 켤
+    # 때마다 백그라운드로 살아나는 건 원하는 동작이 아닙니다. 쓸 때만 띄우세요.
+    stop_grace_period: 30s       # 렌더 중이면 ffmpeg가 정리될 시간을 줍니다

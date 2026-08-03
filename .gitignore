@@ -11,3 +11,7 @@ frontend/dist/
 .DS_Store
 *.egg-info/
 *.tsbuildinfo
+
+# 얼굴 검출 모델은 받아서 쓰는 것이라 커밋하지 않습니다 (안내 파일만 유지)
+backend/models/*
+!backend/models/.gitkeep
