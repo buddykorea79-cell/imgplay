@@ -100,11 +100,27 @@ docker run -p 8000:8000 \
 
 ### 2. Vercel 프로젝트 설정
 
-저장소를 그대로 import하면 됩니다. **Root Directory는 기본값(저장소 루트)
-그대로 두세요** — 빌드 방법은 루트의 `vercel.json`에 들어 있습니다.
+프론트엔드가 `frontend/` 하위에 있어서, Vercel이 어디를 기준으로 빌드하느냐에
+따라 설정이 갈립니다. **두 경우 모두 지원하도록 설정 파일을 두 개 두었습니다.**
+Vercel은 Root Directory에 있는 `vercel.json` 하나만 읽으므로 서로 간섭하지
+않습니다.
+
+#### 방법 A — Root Directory = `frontend` (권장)
+
+Settings → General → Root Directory에 `frontend`를 넣으세요. 커스텀 명령이
+전혀 필요 없습니다.
 
 ```
-루트 package.json   Vercel이 Node 프로젝트로 인식하게 하고 frontend/로 빌드를 위임
+frontend/vercel.json   framework: vite (자동 감지) + SPA 폴백 + 캐시 헤더
+```
+
+Vercel이 Vite를 인식해 `npm ci` → `npm run build` → `dist`를 알아서 합니다.
+빌드 명령이 없으니 npm 버전 차이 같은 변수도 없습니다.
+
+#### 방법 B — Root Directory 비움 (저장소 루트)
+
+```
+루트 package.json   Vercel이 Node 프로젝트로 인식하게 합니다
 vercel.json         installCommand · buildCommand · outputDirectory(frontend/dist)
 ```
 
@@ -112,9 +128,9 @@ vercel.json         installCommand · buildCommand · outputDirectory(frontend/d
 의도적입니다. `--prefix`는 npm 버전에 따라 `ci`가 락파일을 찾는 위치가 달라져
 `EUSAGE` 오류로 죽습니다.
 
-루트 `package.json`이 없으면 Vercel은 이 저장소를 **정적 사이트로 취급해
-`vercel.json`의 빌드 명령을 실행하지 않습니다.** 그러면 루트에 `index.html`이
-없으므로 배포는 성공했는데 접속하면 `404: NOT_FOUND`가 뜹니다.
+> **주의**: Root Directory를 `frontend`로 두면 루트의 `vercel.json`은 읽히지
+> 않습니다. 반대로 비워두면 `frontend/vercel.json`이 무시됩니다. 어느 쪽이든
+> 한 파일만 적용됩니다.
 
 환경변수 하나만 추가합니다.
 
@@ -139,14 +155,15 @@ vercel.json         installCommand · buildCommand · outputDirectory(frontend/d
 배포 자체가 실패했거나 빌드가 안 돌았다는 뜻입니다. Vercel 대시보드에서
 확인하세요.
 
-1. **Deployment → Building 로그**에 `installCommand` / `buildCommand`가 찍혔는지.
-   안 찍혔다면 Vercel이 빌드 단계를 건너뛴 것입니다.
-2. **Settings → General → Root Directory**가 비어 있는지(= 저장소 루트).
-   `frontend`로 바꿔 두었다면 루트의 `vercel.json`이 읽히지 않습니다. 비우거나,
-   `frontend`를 쓸 거라면 Framework Preset을 Vite로 두고 Output Directory는
-   `dist`로 두세요.
-3. **Settings → Build & Deployment**에서 Output Directory를 손으로 덮어쓰지
-   않았는지. `vercel.json`의 `frontend/dist`와 어긋나면 빈 배포가 됩니다.
+1. **Settings → General → Root Directory**를 먼저 보세요. 위 A/B 중 어느
+   쪽인지에 따라 적용되는 설정 파일이 달라집니다. 확실하지 않으면 `frontend`로
+   두는 방법 A가 변수가 가장 적습니다.
+2. **Deployment → Building 로그**에 install/build 명령이 찍혔는지.
+   `cd frontend && npm ci`가 즉시(1초 이내) 실패한다면 작업 디렉터리에
+   `frontend/`가 없다는 뜻입니다 — Root Directory가 이미 `frontend`인데 루트
+   설정이 적용된 상태이므로, 방법 A로 정리하세요.
+3. **Settings → Build & Deployment**에서 Install/Build/Output을 손으로
+   덮어쓰지 않았는지. 대시보드 값이 남아 있으면 `vercel.json`과 어긋납니다.
 
 ### 얼굴 검출 모델 (선택)
 
