@@ -1,0 +1,15 @@
+{
+    "name": "photo-video-tuner",
+    "version": "0.1.0",
+    "private": true,
+    "description": "사진 → 영상 2단계 튜닝 웹앱. 실제 프론트엔드는 frontend/ 에 있고, 이 파일은 저장소 루트에서 빌드를 위임하기 위한 것입니다.",
+    "scripts": {
+        "dev": "npm --prefix frontend run dev",
+        "build": "npm --prefix frontend run build",
+        "typecheck": "npm --prefix frontend run typecheck",
+        "preview": "npm --prefix frontend run preview"
+    },
+    "engines": {
+        "node": ">=20"
+    }
+}
