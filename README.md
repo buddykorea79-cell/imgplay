@@ -108,6 +108,10 @@ docker run -p 8000:8000 \
 vercel.json         installCommand · buildCommand · outputDirectory(frontend/dist)
 ```
 
+빌드 명령이 `npm --prefix frontend ci`가 아니라 `cd frontend && npm ci`인 것은
+의도적입니다. `--prefix`는 npm 버전에 따라 `ci`가 락파일을 찾는 위치가 달라져
+`EUSAGE` 오류로 죽습니다.
+
 루트 `package.json`이 없으면 Vercel은 이 저장소를 **정적 사이트로 취급해
 `vercel.json`의 빌드 명령을 실행하지 않습니다.** 그러면 루트에 `index.html`이
 없으므로 배포는 성공했는데 접속하면 `404: NOT_FOUND`가 뜹니다.
