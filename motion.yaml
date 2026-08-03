@@ -1,34 +1,48 @@
+# 2단계 영상 효과 규칙. 출력 규격을 바꾸면 안전 줌 상한이 다시 계산됩니다.
+# 이 파일은 앱이 저장할 때마다 다시 씁니다 — 직접 단 주석은 유지되지 않습니다.
 version: 1
+
+# 출력 규격. preview_height는 클립 미리보기 속도 손잡이입니다
 output:
   width: 1920
   height: 1080
   fps: 30
-  preview_height: 540          # 클립 미리보기 해상도
+  preview_height: 540
+
+# 클립 길이. 어지럽다면 zoom.amount보다 base_sec을 먼저 늘리세요
 duration:
   base_sec: 5.0
   min_sec: 3.0
   max_sec: 8.0
-  complexity_bonus: 0.0        # sharpness 높으면 +초. 0이면 비활성
+  complexity_bonus: 0.0
+
+# safety × (원본 해상도 여유) 가 사진별 줌 상한이 됩니다
 zoom:
   enabled: true
-  amount: 0.12                 # 기본 12% 줌
+  amount: 0.12
   hard_max: 1.35
-  safety: 0.9                  # 안전 줌 상한 계수
-  direction: auto              # auto | in | out | alternate
-  ease: linear                 # linear | ease_in_out
+  safety: 0.9
+  direction: auto
+  ease: linear
+
+# 관심영역(얼굴 → 엣지 무게중심) 방향으로 이동
 pan:
   enabled: true
-  toward_poi: true             # 관심영역으로 수렴
-  max_offset: 0.18             # 프레임 대비 최대 이동 비율
+  toward_poi: true
+  max_offset: 0.18
+
+# 세로 사진 등 종횡비가 다른 사진의 처리 방식
 aspect:
-  mode: blur_fill              # blur_fill | crop | pad
-  blur_sigma: 40
-  deviation_threshold: 0.12    # 이 값 초과 시 aspect.mode 적용
+  mode: blur_fill
+  blur_sigma: 40.0
+  deviation_threshold: 0.12
+
+# 인접 사진의 히스토그램 거리와 EXIF 촬영 간격으로 결정
 transition:
   default: fade
   duration_sec: 0.8
-  similar_threshold: 0.25      # 히스토그램 거리 < 이 값이면 유사
-  different_threshold: 0.60    # 초과하면 검정 경유
+  similar_threshold: 0.25
+  different_threshold: 0.6
   on_similar: fade
   on_different: fadeblack
-  on_scene_gap_min: 30         # EXIF 촬영 간격 30분 이상이면 장면 전환으로 간주
+  on_scene_gap_min: 30.0

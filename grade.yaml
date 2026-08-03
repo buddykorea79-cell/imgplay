@@ -1,26 +1,60 @@
+# 1단계 화질 보정 규칙. 값을 바꾸면 재측정 없이 즉시 반영됩니다.
+# 이 파일은 앱이 저장할 때마다 다시 씁니다 — 직접 단 주석은 유지되지 않습니다.
 version: 1
+
+# 보정이 도달하려는 목표값
 target:
   median_L: 50.0
   spread_L: 55.0
   mean_sat: 0.42
-gamma:      { enabled: true, min: 0.75, max: 1.35 }
-contrast:   { min: 0.92, max: 1.28, clip_threshold_pct: 1.0, clip_penalty: 0.06 }
-saturation: { min: 0.88, max: 1.32, skin_max: 1.10 }
-unsharp:    { base: 1.2, divisor: 400.0, min: 0.2, max: 1.2 }
-whitebalance: { enabled: true, max_deviation: 0.15 }
+
+# 밝기. 가드가 걸리면 max보다 더 낮게 눌립니다
+gamma:
+  enabled: true
+  min: 0.75
+  max: 1.35
+
+# 대비. 클리핑이 임계를 넘으면 clip_penalty만큼 깎습니다
+contrast:
+  min: 0.92
+  max: 1.28
+  clip_threshold_pct: 1.0
+  clip_penalty: 0.06
+
+# 채도. 얼굴이 검출되면 상한이 skin_max로 내려갑니다
+saturation:
+  min: 0.88
+  max: 1.32
+  skin_max: 1.1
+
+# 선명도 = base - sharpness / divisor (sharpness는 1024px 정규화)
+unsharp:
+  base: 1.2
+  divisor: 400.0
+  min: 0.2
+  max: 1.2
+
+# 그레이월드. max_deviation이 단색 화면에서의 폭주를 막습니다
+whitebalance:
+  enabled: true
+  max_deviation: 0.15
+
+# 촬영 조건별 상한 덮어쓰기. 클램프 히트로 기록됩니다
 guards:
-  night:                        # EXIF 기반 야경 판정
+  night:
     enabled: true
     iso_min: 1600
-    shutter_max: 0.04           # 1/25초
-    hour_range: [19, 6]
-    gamma_max: 1.10
+    shutter_max: 0.04
+    hour_range:
+    - 19
+    - 6
+    gamma_max: 1.1
     saturation_max: 1.15
-  lowkey:                       # EXIF 없을 때 폴백
+  lowkey:
     enabled: true
-    median_L_below: 28
+    median_L_below: 28.0
     gamma_max: 1.15
-  highcontrast:                 # 역광·실루엣 추정
+  highcontrast:
     enabled: true
-    spread_L_above: 78
+    spread_L_above: 78.0
     contrast_max: 1.05

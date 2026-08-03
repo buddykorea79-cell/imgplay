@@ -1,0 +1,17 @@
+services:
+  tuner:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # 규칙 파일을 바인드해 컨테이너 안에서 튜닝한 값이 저장소에 남습니다.
+      - ./grade.yaml:/app/grade.yaml
+      - ./motion.yaml:/app/motion.yaml
+      # 작업 산출물. 컨테이너를 지워도 중간본과 캐시가 유지됩니다.
+      - ./work:/app/work
+      - ./.cache:/app/.cache
+      # 얼굴 검출 모델 (선택). scripts/fetch_face_model.sh로 받습니다.
+      - ./backend/models:/app/backend/models
+    environment:
+      PVT_RENDER_PARALLEL: "3"   # 동시 ffmpeg 개수. CPU 코어에 맞춰 조정하세요.
+    restart: unless-stopped

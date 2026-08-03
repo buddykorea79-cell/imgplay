@@ -6,8 +6,11 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import threading
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from .cache import sha256_file
@@ -32,6 +35,7 @@ from .timeline import decide_transitions, total_duration
 
 __all__ = [
     "ingest_file",
+    "ingest_many",
     "evaluate_grade",
     "commit_grade",
     "evaluate_motion",
@@ -45,7 +49,51 @@ IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp", ".bmp", ".h
 # ------------------------------------------------------------------ 1단계
 
 
-def ingest_file(state: AppState, src: Path, original_name: str | None = None) -> Photo:
+def ingest_many(
+    state: AppState,
+    sources: list[tuple[Path, str]],
+    workers: int | None = None,
+    progress=None,
+) -> tuple[list[Photo], list[tuple[str, str]]]:
+    """여러 장을 병렬로 들인다. `(성공 목록, [(파일명, 오류)])`.
+
+    측정은 CPU 바운드이지만 OpenCV/numpy가 GIL을 놓기 때문에 스레드로 충분히
+    병렬화됩니다. 한 장이 실패해도 나머지는 계속 진행합니다.
+    """
+    if workers is None:
+        workers = max(1, min(len(sources), (os.cpu_count() or 2)))
+
+    photos: list[Photo] = []
+    errors: list[tuple[str, str]] = []
+    lock = threading.Lock()
+
+    def one(item: tuple[Path, str]) -> None:
+        src, name = item
+        try:
+            photo = ingest_file(state, src, name, defer_save=True)
+        except Exception as exc:  # noqa: BLE001 - 한 장 실패로 전체를 막지 않는다
+            with lock:
+                errors.append((name, str(exc)))
+            return
+        with lock:
+            photos.append(photo)
+            if progress:
+                progress(len(photos) + len(errors), len(sources), name)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(one, sources))
+
+    with state.lock:
+        state.save()  # 장마다 쓰지 않고 마지막에 한 번만 기록한다
+    return photos, errors
+
+
+def ingest_file(
+    state: AppState,
+    src: Path,
+    original_name: str | None = None,
+    defer_save: bool = False,
+) -> Photo:
     """파일 1장을 업로드 폴더로 들이고 측정한다. 해시가 같으면 캐시를 씁니다.
 
     **원본 파일은 절대 수정하지 않습니다**(섹션 12-9). 업로드 폴더로 복사만 합니다.
@@ -85,9 +133,11 @@ def ingest_file(state: AppState, src: Path, original_name: str | None = None) ->
     )
     with state.lock:
         state.photos[photo_id] = photo
-        if photo_id not in state.order:
-            state.order.append(photo_id)
-        state.save()
+        # `state.order`는 **사용자가 명시적으로 정한 순서**만 담습니다. 인제스트가
+        # 여기에 손대면 병렬 처리 완료 순서가 그대로 타임라인이 되어버립니다.
+        # 비워두면 `ordered_photos`가 EXIF 촬영시각으로 정렬합니다.
+        if not defer_save:
+            state.save()
     return photo
 
 

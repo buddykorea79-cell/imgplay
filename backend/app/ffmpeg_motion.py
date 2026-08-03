@@ -33,6 +33,11 @@ __all__ = [
 
 UPSCALE_FACTOR = 4  # 섹션 10.2(c). 이 값을 1로 두면 줌이 떨립니다.
 _VIDEO_ARGS = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p"]
+# 미리보기 전용 인코더 설정. **필터 체인은 최종 렌더와 완전히 동일합니다** —
+# 바뀌는 것은 압축 품질뿐이라 눈으로 판단하는 모션은 그대로입니다.
+_PREVIEW_VIDEO_ARGS = [
+    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p",
+]
 
 
 def _aspect_prelude(mode: str, w: int, h: int, sigma: float) -> str:
@@ -158,11 +163,15 @@ def render_clip(
     rules: MotionRules,
     height: int | None = None,
     grade_filters: list[str] | None = None,
+    preview: bool = False,
 ) -> Path:
     """사진 1장 → 클립 mp4.
 
     `grade_filters`를 주면 중간본 없이 원본에서 단일 패스로 렌더합니다
     (디스크 절약용, 결과는 동일).
+
+    `preview=True`는 인코더만 빠른 설정으로 바꿉니다. 필터 체인은 그대로라
+    미리보기에서 본 모션이 최종 렌더에서 그대로 재현됩니다.
     """
     dst.parent.mkdir(parents=True, exist_ok=True)
     chain = build_clip_filter(p, out, rules, height)
@@ -176,7 +185,7 @@ def render_clip(
         "-filter_complex", chain,
         "-frames:v", str(frames),
         "-r", str(out.fps),
-        *_VIDEO_ARGS,
+        *(_PREVIEW_VIDEO_ARGS if preview else _VIDEO_ARGS),
         "-an",
         str(dst),
     ]

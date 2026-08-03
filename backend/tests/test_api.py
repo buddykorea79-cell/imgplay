@@ -250,3 +250,19 @@ def test_export_zip(client, photos):
 
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         assert {"grade.yaml", "motion.yaml", "build.sh", "stats.csv"} <= set(z.namelist())
+
+
+def test_규칙_저장이_설명_주석을_유지한다(client, isolated_rules):
+    """확정할 때마다 파일을 덮어쓰므로, 설명이 매번 다시 붙어야 합니다."""
+    import yaml
+
+    rules = client.get("/api/rules/grade").json()
+    rules["target"]["median_L"] = 52.0
+    client.put("/api/rules/grade", json=rules)
+
+    text = (isolated_rules / "grade.yaml").read_text(encoding="utf-8")
+    assert text.startswith("#"), "헤더 주석이 없습니다"
+    assert "# 밝기." in text, "섹션 설명이 없습니다"
+    # 주석이 붙어도 값은 그대로 되읽혀야 한다
+    assert yaml.safe_load(text)["target"]["median_L"] == 52.0
+    assert client.get("/api/rules/grade").json()["target"]["median_L"] == 52.0

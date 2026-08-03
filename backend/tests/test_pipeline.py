@@ -256,3 +256,40 @@ def test_build_sh는_한글_파일명을_인용한다(loaded):
     )
     for p in loaded.photos.values():
         assert f"'{p.filename}'" in script, f"파일명이 인용되지 않음: {p.filename}"
+
+
+def test_기본_순서는_촬영시각_순이다(state, photo_dir: Path):
+    """완료 기준: 사진이 EXIF 촬영시각 순으로 정렬된다.
+
+    인제스트는 병렬이라 완료 순서가 매번 다릅니다. 그 순서가 타임라인이 되면
+    안 됩니다.
+    """
+    from app.pipeline import ingest_many
+
+    sources = [(f, f.name) for f in sorted(photo_dir.glob("*.jpg"))]
+    ingest_many(state, sources)
+
+    ordered = state.ordered_photos()
+    dated = [p for p in ordered if p.captured_at]
+    assert [p.captured_at for p in dated] == sorted(p.captured_at for p in dated)
+    # 촬영시각이 없는 사진은 뒤로
+    assert all(p.captured_at for p in ordered[: len(dated)])
+
+    # 여러 번 불러도 같은 순서여야 한다
+    assert [p.id for p in state.ordered_photos()] == [p.id for p in ordered]
+
+
+def test_수동_순서가_유지되고_새_사진은_뒤에_붙는다(state, photo_dir: Path):
+    from app.pipeline import ingest_many
+
+    files = sorted(photo_dir.glob("*.jpg"))
+    ingest_many(state, [(f, f.name) for f in files[:3]])
+
+    manual = list(reversed([p.id for p in state.ordered_photos()]))
+    state.order = manual
+    assert [p.id for p in state.ordered_photos()] == manual
+
+    ingest_many(state, [(f, f.name) for f in files[3:]])
+    after = [p.id for p in state.ordered_photos()]
+    assert after[: len(manual)] == manual, "수동 순서가 깨졌습니다"
+    assert len(after) == len(files), "새로 추가된 사진이 유실됐습니다"

@@ -23,7 +23,7 @@ from .faces import face_model_available
 from .ffmpeg_grade import render_preview_jpeg
 from .ffmpeg_motion import clip_cache_name, render_clip, render_transition_preview
 from .grade import compute_grade
-from .pipeline import IMAGE_SUFFIXES, evaluate_grade, evaluate_motion, ingest_file
+from .pipeline import IMAGE_SUFFIXES, evaluate_grade, evaluate_motion, ingest_many
 from .render import start_render
 from .schemas import (
     CommitRequest,
@@ -118,8 +118,11 @@ def put_rules(kind: str, body: dict) -> dict:
 @app.post("/api/photos")
 async def upload_photos(files: list[UploadFile]) -> list[dict]:
     st = get_state()
-    results = []
-    errors = []
+    errors: list[dict] = []
+    staged: list[tuple[Path, str]] = []
+
+    # 업로드는 순차로 받아 임시 파일에 쓰고(네트워크 바운드), 측정은 병렬로
+    # 돌립니다(CPU 바운드). 섞으면 둘 다 느려집니다.
     for uf in files:
         name = Path(uf.filename or "unnamed").name
         if Path(name).suffix.lower() not in IMAGE_SUFFIXES:
@@ -133,16 +136,20 @@ async def upload_photos(files: list[UploadFile]) -> list[dict]:
                 if size > MAX_UPLOAD_BYTES:
                     break
                 tmp.write(chunk)
-        try:
-            if size > MAX_UPLOAD_BYTES:
-                errors.append({"filename": name, "error": "파일이 너무 큽니다"})
-                continue
-            photo = await asyncio.to_thread(ingest_file, st, tmp_path, name)
-            results.append(photo.to_payload())
-        except Exception as exc:  # noqa: BLE001 - 한 장 실패로 전체를 막지 않는다
-            errors.append({"filename": name, "error": str(exc)})
-        finally:
+        if size > MAX_UPLOAD_BYTES:
             tmp_path.unlink(missing_ok=True)
+            errors.append({"filename": name, "error": "파일이 너무 큽니다"})
+            continue
+        staged.append((tmp_path, name))
+
+    try:
+        photos, failures = await asyncio.to_thread(ingest_many, st, staged)
+    finally:
+        for tmp_path, _ in staged:
+            tmp_path.unlink(missing_ok=True)
+
+    errors += [{"filename": n, "error": e} for n, e in failures]
+    results = [p.to_payload() for p in photos]
 
     if errors and not results:
         raise HTTPException(422, {"errors": errors})
@@ -364,7 +371,9 @@ async def motion_clip_preview(photo_id: str, body: MotionEvaluateRequest) -> Fil
     height = rules.output.preview_height
     dst = st.work.clips / clip_cache_name(f"{p.id}p", mp, rules.output, rules, height)
     if not dst.is_file():
-        await asyncio.to_thread(render_clip, src, dst, mp, rules.output, rules, height)
+        await asyncio.to_thread(
+            render_clip, src, dst, mp, rules.output, rules, height, None, True
+        )
     return FileResponse(dst, media_type="video/mp4", filename=dst.name)
 
 
@@ -386,7 +395,9 @@ async def motion_transition_preview(index: int, body: MotionEvaluateRequest) -> 
         src = p.graded_path if p.graded_path and p.graded_path.is_file() else p.path
         cdst = st.work.clips / clip_cache_name(f"{p.id}p", mp, rules.output, rules, height)
         if not cdst.is_file():
-            await asyncio.to_thread(render_clip, src, cdst, mp, rules.output, rules, height)
+            await asyncio.to_thread(
+                render_clip, src, cdst, mp, rules.output, rules, height, None, True
+            )
         clips.append(cdst)
 
     key = params_key(spec.model_dump(), [c.name for c in clips])

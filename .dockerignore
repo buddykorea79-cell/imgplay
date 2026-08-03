@@ -1,0 +1,8 @@
+work/
+.cache/
+**/node_modules/
+**/dist/
+**/.venv/
+**/__pycache__/
+.git/
+backend/models/

@@ -90,10 +90,15 @@ class AppState:
         return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
 
     def write_rules(self, kind: str, data: dict) -> None:
+        """규칙을 yaml로 저장한다.
+
+        UI에서 확정할 때마다 이 파일을 덮어쓰므로, 손으로 적어둔 주석은 사라집니다.
+        대신 설명을 자동으로 다시 붙여 파일이 항상 스스로를 설명하게 만듭니다
+        (주석 왕복 보존은 ruamel.yaml 의존성이 필요해 쓰지 않았습니다).
+        """
         p = self.rules_path(kind)
-        p.write_text(
-            yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
-        )
+        body = yaml.safe_dump(data, allow_unicode=True, sort_keys=False)
+        p.write_text(_annotate_yaml(kind, body), encoding="utf-8")
 
     # ------------------------------------------------------------ 영속화
 
@@ -146,16 +151,22 @@ class AppState:
     # ------------------------------------------------------------ 조회
 
     def ordered_photos(self, order: list[str] | None = None) -> list[Photo]:
-        """지정 순서 → 저장된 순서 → 촬영시각 순."""
+        """지정 순서 → 저장된 수동 순서 → EXIF 촬영시각 순.
+
+        수동 순서에 없는 사진(나중에 추가된 사진)은 촬영시각 순으로 뒤에 붙여
+        유실을 막습니다.
+        """
         from .timeline import TimelineEntry, sort_by_capture_time
 
-        ids = order or self.order
-        if not ids:
-            entries = [
-                TimelineEntry(p.id, p.filename, p.captured_at) for p in self.photos.values()
-            ]
-            ids = sort_by_capture_time(entries)
-        return [self.photos[i] for i in ids if i in self.photos]
+        def by_capture(photos: list[Photo]) -> list[str]:
+            return sort_by_capture_time(
+                [TimelineEntry(p.id, p.filename, p.captured_at) for p in photos]
+            )
+
+        ids = [i for i in (order or self.order) if i in self.photos]
+        seen = set(ids)
+        ids += by_capture([p for p in self.photos.values() if p.id not in seen])
+        return [self.photos[i] for i in ids]
 
     def invalidate_stage2(self) -> None:
         """1단계로 되돌아가기. 통계 캐시는 유지합니다."""
@@ -174,6 +185,44 @@ class AppState:
             self.committed = False
             self.work.clear_stage2()
             self._registry.unlink(missing_ok=True)
+
+
+_HEADERS = {
+    "grade": "1단계 화질 보정 규칙. 값을 바꾸면 재측정 없이 즉시 반영됩니다.",
+    "motion": "2단계 영상 효과 규칙. 출력 규격을 바꾸면 안전 줌 상한이 다시 계산됩니다.",
+}
+
+# 최상위 키에 붙일 한 줄 설명. 규칙 파일을 처음 여는 사람이 헤매지 않게 합니다.
+_SECTION_NOTES = {
+    "target": "보정이 도달하려는 목표값",
+    "gamma": "밝기. 가드가 걸리면 max보다 더 낮게 눌립니다",
+    "contrast": "대비. 클리핑이 임계를 넘으면 clip_penalty만큼 깎습니다",
+    "saturation": "채도. 얼굴이 검출되면 상한이 skin_max로 내려갑니다",
+    "unsharp": "선명도 = base - sharpness / divisor (sharpness는 1024px 정규화)",
+    "whitebalance": "그레이월드. max_deviation이 단색 화면에서의 폭주를 막습니다",
+    "guards": "촬영 조건별 상한 덮어쓰기. 클램프 히트로 기록됩니다",
+    "output": "출력 규격. preview_height는 클립 미리보기 속도 손잡이입니다",
+    "duration": "클립 길이. 어지럽다면 zoom.amount보다 base_sec을 먼저 늘리세요",
+    "zoom": "safety × (원본 해상도 여유) 가 사진별 줌 상한이 됩니다",
+    "pan": "관심영역(얼굴 → 엣지 무게중심) 방향으로 이동",
+    "aspect": "세로 사진 등 종횡비가 다른 사진의 처리 방식",
+    "transition": "인접 사진의 히스토그램 거리와 EXIF 촬영 간격으로 결정",
+}
+
+
+def _annotate_yaml(kind: str, body: str) -> str:
+    """덤프된 yaml에 헤더와 섹션 주석을 다시 붙인다."""
+    header = (
+        f"# {_HEADERS.get(kind, '')}\n"
+        f"# 이 파일은 앱이 저장할 때마다 다시 씁니다 — 직접 단 주석은 유지되지 않습니다.\n"
+    )
+    out: list[str] = []
+    for line in body.splitlines():
+        key = line.split(":", 1)[0]
+        if line and not line[0].isspace() and key in _SECTION_NOTES:
+            out.append(f"\n# {_SECTION_NOTES[key]}")
+        out.append(line)
+    return header + "\n".join(out) + "\n"
 
 
 def _exif_from_dict(d: dict) -> Exif:

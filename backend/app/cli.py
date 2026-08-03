@@ -31,7 +31,7 @@ from .pipeline import (
     ensure_compositions,
     evaluate_grade,
     evaluate_motion,
-    ingest_file,
+    ingest_many,
 )
 from .render import RenderJob, run_render
 from .state import get_state
@@ -53,15 +53,15 @@ def cmd_ingest(args) -> int:
         print(f"경로가 없습니다: {root}", file=sys.stderr)
         return 1
 
+    sources = [(f, f.name) for f in _iter_images(root)]
+    if not sources:
+        print(f"이미지를 찾지 못했습니다: {root}", file=sys.stderr)
+        return 1
+
     t0 = time.time()
-    count = 0
-    for f in _iter_images(root):
-        try:
-            p = ingest_file(st, f, f.name)
-        except Exception as exc:  # noqa: BLE001
-            print(f"  ✗ {f.name}: {exc}", file=sys.stderr)
-            continue
-        count += 1
+    photos, errors = ingest_many(st, sources)
+
+    for p in sorted(photos, key=lambda p: p.filename):
         s = p.stats
         print(
             f"  {p.filename:<32.32s} {s.width}x{s.height}  "
@@ -69,8 +69,11 @@ def cmd_ingest(args) -> int:
             f"sharp={s.sharpness:7.1f} faces={len(p.faces)} "
             f"iso={p.exif.iso or '-'}"
         )
-    print(f"\n{count}장 측정 완료 ({time.time() - t0:.1f}초)")
-    return 0
+    for name, err in errors:
+        print(f"  ✗ {name}: {err}", file=sys.stderr)
+
+    print(f"\n{len(photos)}장 측정 완료 ({time.time() - t0:.1f}초)")
+    return 0 if photos else 1
 
 
 def cmd_grade(args) -> int:
