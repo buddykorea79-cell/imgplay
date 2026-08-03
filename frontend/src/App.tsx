@@ -10,6 +10,7 @@ import { ClipPreview } from "./components/stage2/ClipPreview";
 import { MotionPanel } from "./components/stage2/MotionPanel";
 import { RenderDialog } from "./components/stage2/RenderDialog";
 import { ExportDialog } from "./components/ExportDialog";
+import { BackendDown } from "./components/BackendDown";
 import { Button } from "./components/ui";
 
 export default function App() {
@@ -25,6 +26,8 @@ export default function App() {
     backToStage1,
     busy,
     reset,
+    backendDown,
+    ready,
   } = useStore();
 
   const [commitProgress, setCommitProgress] = useState<{ done: number; total: number } | null>(
@@ -115,7 +118,13 @@ export default function App() {
         </div>
       )}
 
-      {photos.length === 0 ? (
+      {!ready ? (
+        <main className="flex flex-1 items-center justify-center">
+          <p className="text-xs text-slate-500">불러오는 중…</p>
+        </main>
+      ) : backendDown ? (
+        <BackendDown />
+      ) : photos.length === 0 ? (
         <main className="flex flex-1 items-center justify-center p-8">
           <div className="w-full max-w-xl space-y-4">
             <UploadZone />

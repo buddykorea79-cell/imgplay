@@ -10,7 +10,24 @@ import type {
   TransitionSpec,
 } from "./types";
 
-const BASE = "/api";
+/**
+ * API 서버 주소.
+ *
+ * 로컬에서는 Vite 프록시(`/api` → localhost:8000)를 타므로 기본값이면 됩니다.
+ * 백엔드를 다른 호스트에 띄운 경우(Vercel에 프론트만 올린 경우 등)에는 빌드
+ * 시점에 `VITE_API_BASE`로 절대 주소를 넘기세요:
+ *
+ *     VITE_API_BASE=https://tuner-api.example.com/api
+ *
+ * `vercel.json`의 rewrite로는 처리할 수 없습니다 — Vercel은 rewrite 목적지에
+ * 환경변수를 넣는 것을 지원하지 않고, 프록시를 거치면 클립 mp4 스트리밍이
+ * 응답 크기 제한에 걸립니다. 브라우저가 백엔드로 직접 붙는 편이 낫습니다.
+ */
+const BASE = (import.meta.env.VITE_API_BASE ?? "/api").replace(/\/+$/, "");
+
+/** 백엔드가 이 앱과 다른 출처에 있는가 (안내 문구 분기용). */
+export const isRemoteBackend = /^https?:\/\//i.test(BASE);
+export const apiBase = BASE;
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, {

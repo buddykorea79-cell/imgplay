@@ -41,10 +41,25 @@ from .timeline import TimelineEntry, sort_by_capture_time
 
 app = FastAPI(title="photo-video-tuner", version="0.1.0")
 
+def _cors_origins() -> list[str]:
+    """허용 출처. 기본은 로컬 개발 서버뿐입니다.
+
+    프론트를 다른 호스트(Vercel 등)에 올렸다면 그 주소를 `PVT_CORS_ORIGINS`에
+    쉼표로 넣으세요. `*`를 넣으면 전부 허용하지만, 인증이 없는 앱이라 공개
+    주소에 백엔드를 띄운 경우 아무나 업로드·렌더를 돌릴 수 있게 됩니다.
+    """
+    raw = os.environ.get(
+        "PVT_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    )
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+_ORIGINS = _cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    # 로컬 실행 전제입니다. 인증도 멀티테넌시도 없으므로 개발 서버만 열어둡니다.
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_ORIGINS,
+    # Vercel 프리뷰 배포는 커밋마다 주소가 바뀌므로 정규식으로도 받습니다.
+    allow_origin_regex=os.environ.get("PVT_CORS_ORIGIN_REGEX"),
     allow_methods=["*"],
     allow_headers=["*"],
 )

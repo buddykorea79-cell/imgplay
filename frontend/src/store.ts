@@ -25,6 +25,9 @@ interface State {
   committed: boolean;
   busy: string | null;
   error: string | null;
+  /** 백엔드에 닿지 못함. 정적 호스팅에만 올린 경우가 대부분입니다. */
+  backendDown: boolean;
+  ready: boolean;
 
   // 1단계
   photos: Photo[];
@@ -80,6 +83,8 @@ export const useStore = create<State>((set, get) => {
     committed: false,
     busy: null,
     error: null,
+    backendDown: false,
+    ready: false,
     photos: [],
     selectedId: null,
     gradeRules: null,
@@ -93,6 +98,15 @@ export const useStore = create<State>((set, get) => {
 
     async init() {
       set({ busy: "불러오는 중" });
+      try {
+        // 규칙·사진을 부르기 전에 백엔드 존재부터 확인합니다. 여기서 실패하면
+        // 나머지 요청이 전부 같은 이유로 깨지므로, 오류를 네 번 띄우는 대신
+        // "백엔드에 못 닿음" 한 가지 상태로 정리합니다.
+        await api.health();
+      } catch {
+        set({ backendDown: true, busy: null, ready: true });
+        return;
+      }
       try {
         const [gradeRules, motionRules, photos, status] = await Promise.all([
           api.getGradeRules(),
@@ -110,10 +124,11 @@ export const useStore = create<State>((set, get) => {
         });
         if (photos.length) evaluateGrade(gradeRules);
         if (status.stage2_unlocked) await refreshTimeline(set, get);
+        set({ backendDown: false });
       } catch (e) {
         set({ error: describe(e) });
       } finally {
-        set({ busy: null });
+        set({ busy: null, ready: true });
       }
     },
 

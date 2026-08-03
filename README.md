@@ -65,6 +65,61 @@ npm install && npm run dev      # → http://localhost:5173
 | `PVT_STATIC_DIR` | `<저장소>/frontend/dist` | 빌드된 UI. 패키지를 site-packages에 설치하면 저장소 경로 추론이 빗나가므로 컨테이너에서는 못 박습니다 |
 | `PVT_RENDER_PARALLEL` | `3` | 동시 ffmpeg 개수 |
 | `PVT_FFMPEG` / `PVT_FFPROBE` | `ffmpeg` / `ffprobe` | 바이너리 경로 |
+| `PVT_CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | 프론트를 다른 호스트에 올렸을 때 그 주소 (쉼표 구분) |
+| `PVT_CORS_ORIGIN_REGEX` | 없음 | Vercel 프리뷰처럼 주소가 매번 바뀔 때 |
+
+프론트엔드는 빌드 시점에 `VITE_API_BASE`를 읽습니다. 비워두면 같은 출처의
+`/api`를 씁니다 (로컬 개발에서는 Vite 프록시가 처리).
+
+---
+
+## Vercel 배포
+
+**Vercel에는 프론트엔드만 올라갑니다.** 백엔드는 ffmpeg 시스템 바이너리를
+`subprocess`로 부르고, `work/`에 중간본과 클립 캐시를 쌓고, 렌더가 수 분씩
+걸립니다. 서버리스에는 ffmpeg가 없고 파일시스템이 읽기 전용이며 실행 시간
+제한이 있어 셋 다 성립하지 않습니다.
+
+### 1. 백엔드를 먼저 띄웁니다
+
+이 저장소의 `Dockerfile`을 그대로 받는 곳이면 됩니다 (Fly.io, Railway, Render,
+직접 굴리는 서버 등).
+
+```bash
+docker build -t photo-video-tuner .
+docker run -p 8000:8000 \
+  -e PVT_CORS_ORIGINS=https://내-프로젝트.vercel.app \
+  photo-video-tuner
+```
+
+디스크는 영속 볼륨으로 `/app/work`에 붙이세요. 없으면 재시작할 때마다 중간본과
+캐시가 날아갑니다.
+
+> 인증이 없는 앱입니다. 공개 주소에 백엔드를 띄우면 아무나 업로드·렌더를
+> 돌릴 수 있으니, 접근 제한을 걸거나 사설망에 두세요.
+
+### 2. Vercel 프로젝트 설정
+
+저장소를 그대로 import하면 됩니다. `vercel.json`이 빌드 방법을 담고 있어
+Root Directory는 기본값(저장소 루트) 그대로 두세요.
+
+환경변수 하나만 추가합니다.
+
+| 이름 | 값 |
+|---|---|
+| `VITE_API_BASE` | `https://내-백엔드-주소/api` |
+
+끝에 `/api`까지 포함해야 합니다. 빌드 시점에 번들에 박히므로, 값을 바꾸면
+재배포해야 반영됩니다.
+
+브라우저가 백엔드로 직접 요청합니다. `vercel.json`의 rewrite로 프록시하지
+않는 이유는 두 가지입니다 — Vercel은 rewrite 목적지에 환경변수를 넣지 못하고,
+프록시를 거치면 클립 mp4가 응답 크기 제한에 걸립니다.
+
+### 백엔드 없이 열면
+
+"백엔드에 연결할 수 없습니다" 안내와 함께 해결 방법이 표시됩니다. 빈 화면이나
+정체불명의 오류가 뜨지는 않습니다.
 
 ### 얼굴 검출 모델 (선택)
 

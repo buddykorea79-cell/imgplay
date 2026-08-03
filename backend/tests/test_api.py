@@ -266,3 +266,43 @@ def test_규칙_저장이_설명_주석을_유지한다(client, isolated_rules):
     # 주석이 붙어도 값은 그대로 되읽혀야 한다
     assert yaml.safe_load(text)["target"]["median_L"] == 52.0
     assert client.get("/api/rules/grade").json()["target"]["median_L"] == 52.0
+
+
+def test_cors_기본값은_로컬만_허용한다(client):
+    """인증이 없는 앱이라 기본값이 넓으면 안 됩니다."""
+    r = client.options(
+        "/api/grade/evaluate",
+        headers={
+            "Origin": "https://somewhere-else.example.com",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert "access-control-allow-origin" not in {k.lower() for k in r.headers}
+
+
+def test_cors_출처를_환경변수로_열_수_있다(tmp_path: Path, monkeypatch):
+    """프론트를 다른 호스트(Vercel 등)에 올렸을 때 필요합니다."""
+    monkeypatch.setenv("PVT_WORK_DIR", str(tmp_path / "work"))
+    monkeypatch.setenv("PVT_CORS_ORIGINS", "https://my-app.vercel.app, http://localhost:5173")
+
+    import importlib
+
+    import app.main as main_mod
+    import app.state as state_mod
+
+    state_mod._state = None
+    reloaded = importlib.reload(main_mod)
+    try:
+        with TestClient(reloaded.app) as c:
+            r = c.options(
+                "/api/grade/evaluate",
+                headers={
+                    "Origin": "https://my-app.vercel.app",
+                    "Access-Control-Request-Method": "POST",
+                },
+            )
+            assert r.headers["access-control-allow-origin"] == "https://my-app.vercel.app"
+    finally:
+        state_mod._state = None
+        monkeypatch.delenv("PVT_CORS_ORIGINS")
+        importlib.reload(main_mod)  # 다른 테스트에 새지 않도록 되돌린다
