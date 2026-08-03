@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -480,7 +481,9 @@ def value_error_handler(_request, exc: ValueError) -> JSONResponse:
 
 
 # 프로덕션 빌드가 있으면 FastAPI가 정적 서빙해 단일 프로세스로 합칩니다.
-_DIST = REPO_ROOT / "frontend" / "dist"
+# 패키지가 site-packages에 설치되면 REPO_ROOT 추론이 빗나가므로, 컨테이너처럼
+# 위치가 확실한 환경에서는 PVT_STATIC_DIR로 못 박습니다.
+_DIST = Path(os.environ.get("PVT_STATIC_DIR", REPO_ROOT / "frontend" / "dist"))
 if _DIST.is_dir():
     app.mount("/", StaticFiles(directory=str(_DIST), html=True), name="ui")
 else:

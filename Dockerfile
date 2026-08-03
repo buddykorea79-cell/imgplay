@@ -26,6 +26,7 @@ COPY --from=frontend /build/dist ./frontend/dist
 
 ENV PVT_WORK_DIR=/app/work \
     PVT_RULES_DIR=/app \
+    PVT_STATIC_DIR=/app/frontend/dist \
     PYTHONUNBUFFERED=1
 EXPOSE 8000
 

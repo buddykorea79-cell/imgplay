@@ -56,6 +56,16 @@ npm install && npm run dev      # → http://localhost:5173
 `frontend/dist`가 빌드되어 있으면 FastAPI가 정적 서빙해 단일 프로세스로 돕니다
 (`npm run build` 후 `http://localhost:8000`).
 
+### 환경 변수
+
+| 변수 | 기본값 | 용도 |
+|---|---|---|
+| `PVT_WORK_DIR` | `<저장소>/work` | 업로드·중간본·클립·최종 출력 |
+| `PVT_RULES_DIR` | `<저장소>` | `grade.yaml`, `motion.yaml` 위치 |
+| `PVT_STATIC_DIR` | `<저장소>/frontend/dist` | 빌드된 UI. 패키지를 site-packages에 설치하면 저장소 경로 추론이 빗나가므로 컨테이너에서는 못 박습니다 |
+| `PVT_RENDER_PARALLEL` | `3` | 동시 ffmpeg 개수 |
+| `PVT_FFMPEG` / `PVT_FFPROBE` | `ffmpeg` / `ffprobe` | 바이너리 경로 |
+
 ### 얼굴 검출 모델 (선택)
 
 없어도 동작합니다. 있으면 채도 상한(`skin_max`)과 2단계 줌 목표점에 얼굴이
