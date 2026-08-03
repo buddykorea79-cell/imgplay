@@ -1,0 +1,26 @@
+version: 1
+target:
+  median_L: 50.0
+  spread_L: 55.0
+  mean_sat: 0.42
+gamma:      { enabled: true, min: 0.75, max: 1.35 }
+contrast:   { min: 0.92, max: 1.28, clip_threshold_pct: 1.0, clip_penalty: 0.06 }
+saturation: { min: 0.88, max: 1.32, skin_max: 1.10 }
+unsharp:    { base: 1.2, divisor: 400.0, min: 0.2, max: 1.2 }
+whitebalance: { enabled: true, max_deviation: 0.15 }
+guards:
+  night:                        # EXIF 기반 야경 판정
+    enabled: true
+    iso_min: 1600
+    shutter_max: 0.04           # 1/25초
+    hour_range: [19, 6]
+    gamma_max: 1.10
+    saturation_max: 1.15
+  lowkey:                       # EXIF 없을 때 폴백
+    enabled: true
+    median_L_below: 28
+    gamma_max: 1.15
+  highcontrast:                 # 역광·실루엣 추정
+    enabled: true
+    spread_L_above: 78
+    contrast_max: 1.05

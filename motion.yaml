@@ -1,0 +1,34 @@
+version: 1
+output:
+  width: 1920
+  height: 1080
+  fps: 30
+  preview_height: 540          # 클립 미리보기 해상도
+duration:
+  base_sec: 5.0
+  min_sec: 3.0
+  max_sec: 8.0
+  complexity_bonus: 0.0        # sharpness 높으면 +초. 0이면 비활성
+zoom:
+  enabled: true
+  amount: 0.12                 # 기본 12% 줌
+  hard_max: 1.35
+  safety: 0.9                  # 안전 줌 상한 계수
+  direction: auto              # auto | in | out | alternate
+  ease: linear                 # linear | ease_in_out
+pan:
+  enabled: true
+  toward_poi: true             # 관심영역으로 수렴
+  max_offset: 0.18             # 프레임 대비 최대 이동 비율
+aspect:
+  mode: blur_fill              # blur_fill | crop | pad
+  blur_sigma: 40
+  deviation_threshold: 0.12    # 이 값 초과 시 aspect.mode 적용
+transition:
+  default: fade
+  duration_sec: 0.8
+  similar_threshold: 0.25      # 히스토그램 거리 < 이 값이면 유사
+  different_threshold: 0.60    # 초과하면 검정 경유
+  on_similar: fade
+  on_different: fadeblack
+  on_scene_gap_min: 30         # EXIF 촬영 간격 30분 이상이면 장면 전환으로 간주
